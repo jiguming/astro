@@ -66,7 +66,7 @@ if uploaded_file:
                         norm_data = (255 * (data_clipped - scale_min) / (scale_max - scale_min)).astype(np.uint8)
 
                     img = Image.fromarray(norm_data)
-                   st.image(img, caption="업로드된 FITS 이미지", use_container_width=True)
+                    st.image(img, caption="업로드된 FITS 이미지", use_container_width=True)
 
 
                 # --- 사이드바: 현재 천체 위치 계산 ---
