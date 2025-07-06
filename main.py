@@ -2,16 +2,26 @@ import streamlit as st
 import numpy as np
 from astropy.io import fits
 from PIL import Image
+from astropy.coordinates import SkyCoord, EarthLocation, AltAz
+from astropy.time import Time
+from datetime import datetime
 
 # --- Streamlit 앱 페이지 설정 ---
 st.set_page_config(page_title="천문 이미지 분석기", layout="wide")
 st.title("🔭 천문 이미지 물리량 처리 앱")
 
-# --- 파일 업로더 ('.fz' 확장자 포함) ---
+# --- 파일 업로더 ---
 uploaded_file = st.file_uploader(
     "분석할 FITS 파일을 선택하세요.",
     type=['fits', 'fit', 'fz']
 )
+
+# --- 서울 위치 설정 (고정값) ---
+seoul_location = EarthLocation(lat=37.5665, lon=126.9780, height=50)  # 서울 위도/경도/고도
+
+# --- 현재 시간 (UTC 기준) ---
+now = datetime.utcnow()
+now_astropy = Time(now)
 
 # --- 파일이 업로드되면 실행될 로직 ---
 if uploaded_file:
@@ -58,6 +68,23 @@ if uploaded_file:
                     img = Image.fromarray(norm_data)
                     st.image(img, caption="업로드된 FITS 이미지", use_column_width=True)
 
+                # --- 사이드바: 현재 천체 위치 계산 ---
+                st.sidebar.header("🧭 현재 천체 위치 (서울 기준)")
+
+                if 'RA' in header and 'DEC' in header:
+                    try:
+                        target_coord = SkyCoord(ra=header['RA'], dec=header['DEC'], unit=('hourangle', 'deg'))
+                        altaz = target_coord.transform_to(AltAz(obstime=now_astropy, location=seoul_location))
+                        altitude = altaz.alt.degree
+                        azimuth = altaz.az.degree
+
+                        st.sidebar.metric("고도 (°)", f"{altitude:.2f}")
+                        st.sidebar.metric("방위각 (°)", f"{azimuth:.2f}")
+                    except Exception as e:
+                        st.sidebar.warning(f"천체 위치 계산 실패: {e}")
+                else:
+                    st.sidebar.info("FITS 헤더에 RA/DEC 정보가 없습니다.")
+
     except Exception as e:
         st.error(f"파일 처리 중 오류가 발생했습니다: {e}")
         st.warning("파일이 손상되었거나 유효한 FITS 형식이 아닐 수 있습니다.")
@@ -68,11 +95,9 @@ else:
 st.divider()
 st.header("💬 의견 남기기")
 
-# 세션 상태 초기화
 if "comments" not in st.session_state:
     st.session_state.comments = []
 
-# 입력 폼
 with st.form(key="comment_form"):
     name = st.text_input("이름을 입력하세요", key="name_input")
     comment = st.text_area("댓글을 입력하세요", key="comment_input")
@@ -85,7 +110,6 @@ with st.form(key="comment_form"):
         else:
             st.warning("이름과 댓글을 모두 입력해주세요.")
 
-# 댓글 출력
 if st.session_state.comments:
     st.subheader("📋 전체 댓글")
     for i, (n, c) in enumerate(reversed(st.session_state.comments), 1):
